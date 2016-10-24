@@ -1,4 +1,6 @@
 #include "packet_interface.h"
+#include <zlib.h>
+#include <stdint.h>
 
 /* Extra #includes */
 /* Your code will be inserted here */
@@ -9,7 +11,7 @@
 */
 struct __attribute__((__packed__)) pkt {
 	ptypes_t type;
-	uint8_t window;
+	uint8_t window : 5;
 	uint8_t seqnum;
 	uint16_t length;
 	uint32_t timestamp;
@@ -33,6 +35,7 @@ pkt_t* pkt_new()
  */
 void pkt_del(pkt_t *pkt)
 {
+		free(pkt->payload);
     free(pkt);
 }
 
@@ -56,12 +59,40 @@ void pkt_del(pkt_t *pkt)
  */
 pkt_status_code pkt_decode(const char *data, const size_t len, pkt_t *pkt)
 {
+
+		// verifie si le type du packet est valide
 		if(pkt->type != ptypes_t.PTYPE_DATA)
 		{
 			return pkt_status_code.E_TYPE;
 		}
 
-		if()
+		uint32_t crc = 0;
+		char buffer [sizeof(uint32_t)];
+		char tab [sizeof(uint32_t)+pkt->length];
+		memset(buffer, 0, strlen(buffer));
+		memset(tab, 0, strlen(tab);
+
+		uint8_t header = 0;
+		header = header | pkt->window;
+		header = header | << 3;
+		header = header | pkt->type;
+
+		buffer[0] = header;
+		buffer[1] = pkt->seqnum ;
+		buffer[2] = (pkt->length >> 8);
+		buffer[3] = pkt->length;
+
+		strcpy(tab, buffer);
+		strcat(tab, pkt->payload);
+		crc = crc32(crc, tab, strlen(tab));
+
+		// If it is a data package first check crc32
+		if(crc != ntohl(pkt->crc))
+		{
+			return pkt_status_code.E_CRC;
+		}
+
+
 }
 
 /*
@@ -77,7 +108,7 @@ pkt_status_code pkt_decode(const char *data, const size_t len, pkt_t *pkt)
  */
 pkt_status_code pkt_encode(const pkt_t* pkt, char *buf, size_t *len)
 {
-		
+
 }
 
 ptypes_t pkt_get_type(const pkt_t *pkt)
@@ -118,37 +149,53 @@ const char* pkt_get_payload(const pkt_t *pkt)
 
 pkt_status_code pkt_set_type(pkt_t *pkt, const ptypes_t type)
 {
-	/* Your code will be inserted here */
+		pkt->type = type;
+		return  pkt_status_code.PKT_OK;
 }
 
 pkt_status_code pkt_set_window(pkt_t *pkt, const uint8_t window)
 {
-	/* Your code will be inserted here */
+		pkt->window = window;
+		return  pkt_status_code.PKT_OK;
 }
 
 pkt_status_code pkt_set_seqnum(pkt_t *pkt, const uint8_t seqnum)
 {
-	/* Your code will be inserted here */
+		pkt->seqnum = seqnum;
+		return  pkt_status_code.PKT_OK;
 }
 
 pkt_status_code pkt_set_length(pkt_t *pkt, const uint16_t length)
 {
-	/* Your code will be inserted here */
+		pkt->length = length;
+		return  pkt_status_code.PKT_OK;
 }
 
 pkt_status_code pkt_set_timestamp(pkt_t *pkt, const uint32_t timestamp)
 {
-	/* Your code will be inserted here */
+		pkt->timestamp = timestamp;
+		return  pkt_status_code.PKT_OK;
 }
 
 pkt_status_code pkt_set_crc(pkt_t *pkt, const uint32_t crc)
 {
-	/* Your code will be inserted here */
+		pkt->crc = crc;
+		return  pkt_status_code.PKT_OK;
 }
 
-pkt_status_code pkt_set_payload(pkt_t *pkt,
-							    const char *data,
-								const uint16_t length)
+pkt_status_code pkt_set_payload(pkt_t *pkt, const char *data, const uint16_t length)
 {
-	/* Your code will be inserted here */
+		pkt->payload = calloc(sizeof(char *)length);
+		if(pkt->payload == NULL)
+		{
+				return pkt_status_code.E_NOMEM;
+		}
+
+		memcpy(pkt->payload, data, length);
+		pkt->length = length;
+		return  pkt_status_code.PKT_OK;
+}
+
+		pkt_set_length(pkt, length);
+
 }
