@@ -38,7 +38,7 @@ pkt_t* pkt_new()
 void pkt_del(pkt_t *pkt)
 {
 		free(pkt->payload);
-    free(pkt);
+    	free(pkt);
 }
 
 ptypes_t pkt_get_type(const pkt_t *pkt)
@@ -161,7 +161,9 @@ pkt_status_code pkt_decode(const char *data, const size_t len, pkt_t *pkt)
 
 			// decoder le header
 			memcpy(&header, data, sizeof(uint32_t));
-			header = ntohl(header);		// reconversion en host order
+
+			// reconversion en host order
+			header = ntohl(header);
 
 			uint16_t length = header;
 			uint8_t seqnum = header >> 16;
@@ -170,7 +172,6 @@ pkt_status_code pkt_decode(const char *data, const size_t len, pkt_t *pkt)
 
 			if(type != PTYPE_DATA && type != PTYPE_ACK)
 			{
-					fprintf(stderr, "ALALFSDLHFAHDSFOH\n");
 					code = E_TYPE;
 					return code;
 			}
@@ -182,34 +183,33 @@ pkt_status_code pkt_decode(const char *data, const size_t len, pkt_t *pkt)
 
 			// decoder le timestamp
 			memcpy(&timestamp, data+sizeof(uint32_t), sizeof(uint32_t));
-			timestamp = ntohl(timestamp);
 			pkt_set_timestamp(pkt, timestamp);
 
 			// si la longuer du payload ne correspond pas a ce qui est marque dans le paquet
 			if(pkt_get_length(pkt) != len-3*sizeof(uint32_t))
 			{
-					fprintf(stderr, "aaaaaaaaaaaaaaaaaaa\n");
 					code = E_LENGTH;
 					return code;
 			}
 
 			//decoder le payload
-			pkt_set_payload(pkt, data+2*sizeof(uint32_t), pkt_get_length(pkt));
+			pkt_set_payload(pkt, data+(2*sizeof(uint32_t)), pkt_get_length(pkt));
 
 			//decode le crc;
 			memcpy(&crc, data+(2*sizeof(uint32_t)+pkt_get_length(pkt)), sizeof(uint32_t));
-			fprintf(stderr, "DECODE oldcrc network order  : %d\n", crc);
+
 			crc = ntohl(crc);
 			pkt_set_crc(pkt, crc);
 
 			uint32_t newCrc = 0;
 			newCrc = crc32(newCrc, (Bytef *)data, (2*sizeof(uint32_t)+pkt_get_length(pkt)));
-			fprintf(stderr, "DECODE newCrc : %d\n", newCrc);
-			fprintf(stderr, "DECODE oldcrc : %d\n", pkt_get_crc(pkt));
+
+			printf("crc of Begin decode  : %u\n", pkt_get_crc(pkt));
+			printf("newcrc apres recalcule : %u\n", newCrc);
+
 			// verifie le crc
 			if(newCrc != pkt_get_crc(pkt))
 			{
-				fprintf(stderr, "xxxxxxxxxxxxxxxxxxxxx\n");
 				code =	E_CRC;
 				return code;
 			}
@@ -235,7 +235,6 @@ pkt_status_code pkt_encode(const pkt_t* pkt, char *buf, size_t *len)
 			// pas assez de place dans le buffer
 			if(*len < (3*sizeof(uint32_t)+pkt_get_length(pkt)))
 			{
-				fprintf(stderr, "rrrrrrrrrrrrrrrrrrrrrrrrr\n");
 					code = E_NOMEM;
 					return code;
 			}
@@ -256,6 +255,7 @@ pkt_status_code pkt_encode(const pkt_t* pkt, char *buf, size_t *len)
 			header = (header | tmp);
 			header = (header | pkt->length);				//ajout length
 
+
 			//conversion en network-byte-order et ajout au buffer
 			header = htonl(header);
 			memcpy(buf, &header, sizeof(uint32_t));
@@ -264,7 +264,6 @@ pkt_status_code pkt_encode(const pkt_t* pkt, char *buf, size_t *len)
 			// creation du timestamp en network-byte-order
 			uint32_t timestamp = 0;
 			timestamp = pkt_get_timestamp(pkt);
-			timestamp = htonl(timestamp);
 			memcpy(buf+size, &timestamp, sizeof(uint32_t));
 			size = size+sizeof(uint32_t); 	// taille occupee dans le buffer ++
 
@@ -275,12 +274,11 @@ pkt_status_code pkt_encode(const pkt_t* pkt, char *buf, size_t *len)
 			// calcul et ajout du crc en network-byte-order dans le buffer
 			uint32_t crc = 0;
 			crc = crc32(crc, (Bytef *)buf, size);
-			fprintf(stderr, "ENCODE CRC host order  : %d\n",crc);
 			crc = htonl(crc);
-			fprintf(stderr, "ENCODE CRC network order  : %d\n",crc);
+
 			memcpy(buf+size, &crc, sizeof(uint32_t));
 			size = size+sizeof(uint32_t);		// taille occupee dans le buffer ++
-			*len = size;										// taille finale occuppee dans le buffer
+			*len = size;						// taille finale occuppee dans le buffer
 
 			code = PKT_OK;
 			return code;
