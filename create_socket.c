@@ -43,3 +43,19 @@ int create_socket(struct sockaddr_in6 *source_addr, int src_port, struct sockadd
 
   return sockfd;
 }
+
+const char * real_address(const char *address, struct sockaddr_in6 *rval){
+  // init
+  struct addrinfo fam, *tmp;
+  memset(&fam, 0, sizeof(fam));
+
+  // setting family for ipv6
+  fam.ai_family = AF_INET6;
+  // identify an Internet host and a service
+  int err = getaddrinfo(address, NULL, &fam, &tmp);
+  // assertion
+  if(err!=0) return strerror(err);
+  // set reval
+  rval = memcpy(rval, tmp->ai_addr, sizeof(struct sockaddr_in6));
+  return NULL;
+}

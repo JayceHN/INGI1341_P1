@@ -25,4 +25,15 @@
  *         or -1 in case of error (explanation will be printed on stderr)
  */
 int create_socket(struct sockaddr_in6 *source_addr, int src_port, struct sockaddr_in6 *dest_addr, int dst_port);
-#endif 
+
+/* Resolve the resource name to an usable IPv6 address
+ * @address: The name to resolve
+ * @rval: Where the resulting IPv6 address descriptor should be stored
+ * @return: NULL if it succeeded, or a pointer towards
+ *          a string describing the error if any.
+ *          (const char* means the caller cannot modify or free the return value,
+ *           so do not use malloc!)
+ */
+const char * real_address(const char *address, struct sockaddr_in6 *rval);
+
+#endif
