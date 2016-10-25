@@ -24,7 +24,7 @@ int create_socket(struct sockaddr_in6 *source_addr, int src_port, struct sockadd
     // assigning a name to a socket
     bindfd = bind(sockfd, (struct sockaddr *) source_addr, sizeof(struct sockaddr_in6));
     // assertion
-    if(b < 0){
+    if(bindfd < 0){
       perror(strerror(errno));
       return -1;
     }
@@ -35,7 +35,7 @@ int create_socket(struct sockaddr_in6 *source_addr, int src_port, struct sockadd
     dest_addr->sin6_port = htons(dst_port);
     connectfd = connect(sockfd, (struct sockaddr *) dest_addr, sizeof(struct sockaddr_in6));
     // assertion
-    if(c < 0){
+    if(connectfd < 0){
       perror(strerror(errno));
       return -1;
     }
