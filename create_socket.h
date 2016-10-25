@@ -15,6 +15,7 @@
 #include <stddef.h>
 #include <errno.h>
 #include <poll.h>
+#include <unistd.h>
 #include "create_socket.h"
 
 /* Creates a socket and initialize it
