@@ -14,6 +14,7 @@
 #include <netinet/in.h>
 #include <stddef.h>
 #include <errno.h>
+#include <poll.h>
 #include "create_socket.h"
 
 /* Creates a socket and initialize it
@@ -35,5 +36,15 @@ int create_socket(struct sockaddr_in6 *source_addr, int src_port, struct sockadd
  *           so do not use malloc!)
  */
 const char * real_address(const char *address, struct sockaddr_in6 *rval);
+
+
+/* Loop reading a socket and printing to stdout,
+ * while reading stdin and writing to the socket
+ * @sfd: The socket file descriptor. It is both bound and connected.
+ * @return: as soon as stdin signals EOF
+ */
+void read_write_loop(int sfd);
+
+int wait_for_client(int sfd);
 
 #endif

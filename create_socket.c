@@ -59,3 +59,67 @@ const char * real_address(const char *address, struct sockaddr_in6 *rval){
   rval = memcpy(rval, tmp->ai_addr, sizeof(struct sockaddr_in6));
   return NULL;
 }
+
+void read_write_loop(int sfd){
+
+  struct pollfd ufds[2];
+
+  int rv = 0;
+  int size = 0;
+  char bufRead[1024];
+  char bufWrite[1024];
+  memset(bufRead, 0, sizeof(bufRead));
+  memset(bufWrite, 0, sizeof(bufWrite));
+
+  ufds[0].fd = fileno(stdin);
+  ufds[0].events = POLLIN;
+
+  ufds[1].fd = sfd;
+  ufds[1].events = POLLIN;
+
+  while(!feof(stdin)){
+    rv = poll(ufds, 2, -1);
+    if(rv == -1){
+      perror("error read_write_loop");
+    }
+
+    if(ufds[0].revents & POLLIN){
+      if((size = read(fileno(stdin), bufRead, sizeof(bufRead))) < 0){
+        fprintf(stderr, "error read_write_loop");
+      }
+      if(write(sfd, bufRead, size) <0){
+        fprintf(stderr, "error read_write_loop");
+      }
+
+    }
+
+    if(ufds[1].revents & POLLIN){
+      if((size = read(sfd, bufWrite, sizeof(bufWrite))) < 0){
+        fprintf(stderr, "error read_write_loop");
+      }
+      if(write(fileno(stdout), bufWrite, size) < 0){
+        fprintf(stderr, "error read_write_loop");
+      }
+    }
+  }
+
+}
+
+int wait_for_client(int sfd){
+  char buff[1024];
+  socklen_t len;
+
+  struct sockaddr_in6 add;
+  memset(&add, 0, sizeof(add));
+
+  if(recvfrom(sfd, buff, sizeof(buff), MSG_PEEK, (struct sockaddr *)&add, &len ) == -1){
+    perror(strerror(errno));
+    return -1;
+  }
+
+  if(connect(sfd, (struct sockaddr*)&add, len) == -1){
+    perror(strerror(errno));
+    return -1;
+  }
+  return 0;
+}
