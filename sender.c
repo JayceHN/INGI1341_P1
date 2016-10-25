@@ -1,4 +1,5 @@
 #include <string.h>
+#include <stdlib.h>
 #include "packet_interface.h"
 #include "create_socket.h"
 
