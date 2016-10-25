@@ -6,6 +6,11 @@
 
 int main(int argc, char *argv[])
 {
+		if(argc < 3)
+		{
+			fprintf(stderr, "Not engough arguments");
+			return -1;
+		}
 		char *filename;
 		char *destName;
 		unsigned int port;
@@ -13,8 +18,6 @@ int main(int argc, char *argv[])
 
 		struct sockaddr_in6 destAdd;
 		memset(&destAdd, 0, sizeof(struct sockaddr_in6));
-		struct sockaddr_in6 srcAdd;
-		memset(&srcAdd, 0, sizeof(struct sockaddr_in6));
 
 		// first argument is -f
 		if(strcmp(argv[1], "-f") == 0)
@@ -42,12 +45,7 @@ int main(int argc, char *argv[])
 				fprintf(stderr, "error while converting address");
 		}
 
-		if(real_address("::1", &srcAdd) != NULL)
-		{
-				fprintf(stderr, "error while converting address");
-		}
-
-		sfd = create_socket(&srcAdd, port, NULL, -1);
+		sfd = create_socket(&destAdd, port, NULL, -1);
 
 		if(sfd > 0 && wait_for_client(sfd) < 0)
 		{
