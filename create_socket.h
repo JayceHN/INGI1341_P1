@@ -25,3 +25,4 @@
  *         or -1 in case of error (explanation will be printed on stderr)
  */
 int create_socket(struct sockaddr_in6 *source_addr, int src_port, struct sockaddr_in6 *dest_addr, int dst_port);
+#endif 
