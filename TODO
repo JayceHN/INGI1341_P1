@@ -1,0 +1,9 @@
+********************************** TODO LIST **********************************
+_______________________________________________________________________________
+
+1. gérer l'envoi des packets par la stdin (modification du RWLoop)
+   Attention : taille buffer, lecture paquet par paquet, seqnum, timestamp, ...
+
+2. gérer la lecture
+
+3. implémenter le selctive repeat 
