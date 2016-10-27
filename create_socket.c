@@ -1,4 +1,10 @@
 #include "create_socket.h"
+#include "packet_interface.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <errno.h>
 
 int create_socket(struct sockaddr_in6 *source_addr, int src_port, struct sockaddr_in6 *dest_addr, int dst_port){
   /******************
@@ -60,16 +66,22 @@ const char * real_address(const char *address, struct sockaddr_in6 *rval){
   return NULL;
 }
 
-void read_write_loop(int sfd){
+void read_write_loop(int sfd, struct sockaddr_in6 *src , struct sockaddr_in6 *dest){
 
   struct pollfd ufds[2];
+  pkt_t *package;
+  int err = 0;
+  socklen_t fromdest = sizeof(struct sockaddr_in6);
+  socklen_t fromsrc = sizeof(struct sockaddr_in6);
 
   int rv = 0;
   int size = 0;
-  char bufRead[1024];
-  char bufWrite[1024];
-  memset(bufRead, 0, sizeof(bufRead));
-  memset(bufWrite, 0, sizeof(bufWrite));
+  char buffer[1024];
+  char encodeBuffer[1024];
+  size_t len = sizeof(encodeBuffer);
+
+  memset(buffer, 0, sizeof(buffer));
+  memset(encodeBuffer, 0, sizeof(encodeBuffer));
 
   ufds[0].fd = fileno(stdin);
   ufds[0].events = POLLIN;
@@ -77,33 +89,63 @@ void read_write_loop(int sfd){
   ufds[1].fd = sfd;
   ufds[1].events = POLLIN;
 
-  while(!feof(stdin)){
+  while(!feof(stdin))
+  {
     rv = poll(ufds, 2, -1);
     if(rv == -1){
       perror("error read_write_loop");
     }
 
-    if(ufds[0].revents & POLLIN){
-      if((size = read(fileno(stdin), bufRead, sizeof(bufRead))) < 0){
-        fprintf(stderr, "error read_write_loop");
+    // SENDER is reading stdin and sending it on the socket
+    if(ufds[0].revents & POLLIN)
+    {
+      //reads from stdin
+      if((size = read(fileno(stdin), buffer, sizeof(buffer))) < 0)
+      {
+        // error while reading stdin
+        fprintf(stderr, "error while reading stdin \n");
       }
-      if(write(sfd, bufRead, size) <0){
-        fprintf(stderr, "error read_write_loop");
+
+      //create a structure with the given information
+      package = pkt_new();
+      pkt_set_type(package, 1);
+      pkt_set_timestamp(package, 1);
+      pkt_set_window(package, 1);
+      pkt_set_payload(package, buffer, size);
+
+      // encode the given package into a new buffer
+      pkt_encode(package, encodeBuffer, &len);         //len is updated to the buffer size
+
+      err = sendto(sfd, encodeBuffer, len, 0, (struct sockaddr*)dest, fromdest);
+      if(err < 0)
+      {
+          perror(strerror(errno));
+          fprintf(stderr, "error while sending message on the socket \n");
       }
 
     }
 
-    if(ufds[1].revents & POLLIN){
-      if((size = read(sfd, bufWrite, sizeof(bufWrite))) < 0){
-        fprintf(stderr, "error read_write_loop");
+    // RECEIVER  is reading the socket and printing the result on stdout
+    if(ufds[1].revents & POLLIN)
+    {
+      // receiver is reading the socket
+      if((size = recvfrom(sfd, buffer, sizeof(buffer), 0, (struct sockaddr*)src, &fromsrc)) < 0)
+      {
+        fprintf(stderr, "error while reading on socket \n");
       }
-      if(write(fileno(stdout), bufWrite, size) < 0){
-        fprintf(stderr, "error read_write_loop");
+
+      //decoding the packet into a structure
+      package = pkt_new();
+      pkt_decode(buffer, size, package);
+
+      // printing out the payload on stdout
+      if(write(fileno(stdout), pkt_get_payload(package), pkt_get_length(package)) < 0)
+      {
+        fprintf(stderr, "error while writing stdout \n");
       }
     }
-  }
-
-}
+  }// end while loop
+}//end function
 
 int wait_for_client(int sfd){
   char buff[1024];

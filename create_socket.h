@@ -43,7 +43,7 @@ const char * real_address(const char *address, struct sockaddr_in6 *rval);
  * @sfd: The socket file descriptor. It is both bound and connected.
  * @return: as soon as stdin signals EOF
  */
-void read_write_loop(int sfd);
+void read_write_loop(int sfd, struct sockaddr_in6 *src, struct sockaddr_in6 *dest);
 
 /* Block the caller until a message is received on sfd,
  * and connect the socket to the source addresse of the received message

@@ -6,12 +6,13 @@
 
 int main(int argc, char *argv[])
 {
+
 		if(argc < 3)
 		{
 			fprintf(stderr, "Not engough arguments");
 			return -1;
 		}
-		char *filename;
+		char *filename = NULL;
 		char *destName;
 		unsigned int port;
 		int sfd = 0;
@@ -32,13 +33,8 @@ int main(int argc, char *argv[])
 		{
 				destName = argv[1];
 				port = atoi(argv[2]);
-
-				// checks if there is a filename too
-				if(strcmp(argv[3], "-f") == 0)
-				{
-						filename = argv[4];
-				}
 		}
+
 
 		if(real_address(destName, &destAdd) != NULL)
 		{
@@ -56,9 +52,13 @@ int main(int argc, char *argv[])
 			fprintf(stderr, "could not create socket");
 		}
 
-		read_write_loop(sfd);
+		//if no file write to stdout
+		if(filename == NULL)
+		{
+				read_write_loop(sfd, &destAdd, NULL);
+		}
 
-		fprintf(stderr, "reveiver END !");
+
 		return EXIT_SUCCESS;
 
 
