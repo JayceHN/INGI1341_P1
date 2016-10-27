@@ -57,8 +57,10 @@ const char * real_address(const char *address, struct sockaddr_in6 *rval){
   struct addrinfo fam, *tmp;
   memset(&fam, 0, sizeof(fam));
 
-  // setting family for ipv6
-  fam.ai_family = AF_INET6;
+  //
+  fam.ai_family = AF_UNSPEC;
+  fam.ai_socktype = SOCK_DGRAM;
+  fam.ai_protocol = IPPROTO_UDP;
   // identify an Internet host and a service
   int err = getaddrinfo(address, NULL, &fam, &tmp);
   // assertion
