@@ -6,6 +6,8 @@
 #include <sys/socket.h>
 #include <errno.h>
 
+#define BUFFERSIZE 1024
+
 int create_socket(struct sockaddr_in6 *source_addr, int src_port, struct sockaddr_in6 *dest_addr, int dst_port){
   /******************
   * INIT
@@ -66,34 +68,62 @@ const char * real_address(const char *address, struct sockaddr_in6 *rval){
   return NULL;
 }
 
-void read_write_loop(int sfd, struct sockaddr_in6 *src , struct sockaddr_in6 *dest){
+void read_write_loop(int sfd, struct sockaddr_in6 *src , struct sockaddr_in6 *dest)
+{
+  // keeps track of the sequence number
+  uint16_t senderSeq = 0;
+  uint16_t receiverSeq = 0;
+  // buffers where packets are stored
+  pkt_t *senderBuffer[5];
+  pkt_t *receiverBuffer[5];
+  for(int i = 0; i < 5; i++)
+  {
+    senderBuffer[i] = pkt_new();
+    receiverBuffer[i] = pkt_new();
+  }
 
+  //keeps track of the size of the sender and receiverBuffer
+  uint8_t senderSize = 5;
+  uint8_t receiverSize = 5;
+
+  //poll structure
   struct pollfd ufds[2];
+
+  // package and length of addresses
   pkt_t *package;
-  int err = 0;
   socklen_t fromdest = sizeof(struct sockaddr_in6);
   socklen_t fromsrc = sizeof(struct sockaddr_in6);
 
+  // other variables
+  int err = 0;
   int rv = 0;
   int size = 0;
-  char buffer[1024];
-  char encodeBuffer[1024];
+  char buffer[BUFFERSIZE];
+  char encodeBuffer[BUFFERSIZE];
   size_t len = sizeof(encodeBuffer);
 
+  // initialize buffers
   memset(buffer, 0, sizeof(buffer));
   memset(encodeBuffer, 0, sizeof(encodeBuffer));
 
+  // poll information
   ufds[0].fd = fileno(stdin);
   ufds[0].events = POLLIN;
 
   ufds[1].fd = sfd;
   ufds[1].events = POLLIN;
 
+  /*
+  * A loop where data is read on stdin, converted into a pkt_t structure
+  * send over a socket, decoded into a buffer and printed on stdout
+  */
   while(!feof(stdin))
   {
+    // checks if there is any error relatif to poll
     rv = poll(ufds, 2, -1);
-    if(rv == -1){
-      perror("error read_write_loop");
+    if(rv == -1)
+    {
+        perror(strerror(errno));
     }
 
     // SENDER is reading stdin and sending it on the socket
@@ -108,9 +138,10 @@ void read_write_loop(int sfd, struct sockaddr_in6 *src , struct sockaddr_in6 *de
 
       //create a structure with the given information
       package = pkt_new();
-      pkt_set_type(package, 1);
-      pkt_set_timestamp(package, 1);
-      pkt_set_window(package, 1);
+      pkt_set_type(package, PTYPE_DATA);
+      //pkt_set_seqnum(package, seqnum);
+      pkt_set_timestamp(package, 1); // TODO NOT IMPLEMENTED YET...
+      pkt_set_window(package, senderSize);
       pkt_set_payload(package, buffer, size);
 
       // encode the given package into a new buffer
@@ -123,11 +154,18 @@ void read_write_loop(int sfd, struct sockaddr_in6 *src , struct sockaddr_in6 *de
           fprintf(stderr, "error while sending message on the socket \n");
       }
 
+      //increment seqnum, free and reset everything
+    //  seqnum++;
+      pkt_del(package);
+      memset(encodeBuffer, 0, BUFFERSIZE);
+      len = BUFFERSIZE;
+
     }
 
     // RECEIVER  is reading the socket and printing the result on stdout
     if(ufds[1].revents & POLLIN)
     {
+
       // receiver is reading the socket
       if((size = recvfrom(sfd, buffer, sizeof(buffer), 0, (struct sockaddr*)src, &fromsrc)) < 0)
       {
@@ -138,11 +176,43 @@ void read_write_loop(int sfd, struct sockaddr_in6 *src , struct sockaddr_in6 *de
       package = pkt_new();
       pkt_decode(buffer, size, package);
 
+      // DEBUGGIN INFORMATION !
+      fprintf(stderr, "SEQNUM : %u\n", pkt_get_seqnum(package));
+      fprintf(stderr, "Buffer size : %u\n", pkt_get_window(package));
+      // DEBUGGING ENDS HERE
+
+      /*// receiver checks de seqnum
+      if(pkt_get_seqnum(package) == receiverSeq)
+      {
+        // creates a packet with the same seqnum, the window and ACKTYPE
+        pkt_t pack = pkt_new();
+        pkt_set_type(pack, PTYPE_ACK);
+        pkt_set_window(pack, receiverSize);
+        pkt_set_seqnum(pack, receiverSeq);
+
+        pkt_encode(pack, encodeBuffer, &len);
+        err = sendto(sfd, encodeBuffer, len, 0, (struct sockaddr*)src, &fromsrc);
+        if(err < 0)
+        {
+            perror(strerror(errno));
+            fprintf(stderr, "error while sending acknowledgment \n");
+        }
+      }
+        */
+
+
+
+
       // printing out the payload on stdout
       if(write(fileno(stdout), pkt_get_payload(package), pkt_get_length(package)) < 0)
       {
         fprintf(stderr, "error while writing stdout \n");
       }
+
+      //free package
+      pkt_del(package);
+      memset(buffer, 0, BUFFERSIZE);
+
     }
   }// end while loop
 }//end function

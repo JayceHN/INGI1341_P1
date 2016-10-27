@@ -37,8 +37,7 @@ pkt_t* pkt_new()
  */
 void pkt_del(pkt_t *pkt)
 {
-		free(pkt->payload);
-    	free(pkt);
+    free(pkt);
 }
 
 ptypes_t pkt_get_type(const pkt_t *pkt)
@@ -203,9 +202,6 @@ pkt_status_code pkt_decode(const char *data, const size_t len, pkt_t *pkt)
 
 			uint32_t newCrc = 0;
 			newCrc = crc32(newCrc, (Bytef *)data, (2*sizeof(uint32_t)+pkt_get_length(pkt)));
-
-			printf("crc of Begin decode  : %u\n", pkt_get_crc(pkt));
-			printf("newcrc apres recalcule : %u\n", newCrc);
 
 			// verifie le crc
 			if(newCrc != pkt_get_crc(pkt))
