@@ -110,7 +110,8 @@ void send_loop(int sfd, struct sockaddr_in6 *dest)
     int size = 0;
     int rv = 0;
 
-    pkt_t *package;
+    pkt_t *package1;
+    pkt_t *package2;
 
     socklen_t fromdest = sizeof(struct sockaddr_in6);
 
@@ -158,41 +159,46 @@ void send_loop(int sfd, struct sockaddr_in6 *dest)
           }
 
           fprintf(stderr, "Reading data from stdin !\n");
+          
           if(bufferSize > 0)
           {
             //create a structure with the given information
-            package = pkt_new();
-            pkt_set_type(package, PTYPE_DATA);
-            pkt_set_seqnum(package, seqnum);
+            package1 = pkt_new();
+            pkt_set_type(package1, PTYPE_DATA);
+            pkt_set_seqnum(package1, seqnum);
             now = time(0);
             tm = localtime (&now);
             stamp = tm->tm_sec;
-            fprintf(stderr, "STAMP = %d  !\n", stamp);
-            pkt_set_timestamp(package, stamp);
-            pkt_set_window(package, bufferSize);
-            pkt_set_payload(package, decode, size);
-            pkt_encode(package, encode, &len);
+            pkt_set_timestamp(package1, stamp);
+            pkt_set_window(package1, bufferSize);
+            pkt_set_payload(package1, decode, size);
+            pkt_encode(package1, encode, &len);
+            
             fprintf(stderr, "Data was converted into package, now we send it \n");
+            
             err = sendto(sfd, encode, len, 0, (struct sockaddr*)dest, fromdest);
             if(err < 0)
             {
               perror(strerror(errno));
               fprintf(stderr, "error while sending message on the socket \n");
             }
+
             fprintf(stderr, "pacakge was send with success\n");
+
             seqnum++;
             memset(encode, 0, MAXSIZE);
             len = MAXSIZE;
 
             fprintf(stderr, "We put the package into the buffer \n");
 
+            
+
             for(int i = 0 ; i < 5 ; i++)
             {
               if(senderBuffer[i] == NULL)
               {
                 fprintf(stderr, "package put into senderBuffer[%d] !\n", i);
-                senderBuffer[i] = package;
-                pkt_del(package);
+                senderBuffer[i] = package1;
                 bufferSize--;
                 break;
               }
@@ -212,16 +218,16 @@ void send_loop(int sfd, struct sockaddr_in6 *dest)
           {
               fprintf(stderr, "error while receiving on socket \n" );
           }
-              package = pkt_new();
-              pkt_decode(decode, size, package);
+              package2 = pkt_new();
+              pkt_decode(decode, size, package2);
 
-              fprintf(stderr, "ACKNOWLEGMENT TYPE : %u\n", pkt_get_type(package));
-              fprintf(stderr, "ACKNOWLEGMENT SEQNUM : %u\n", pkt_get_seqnum(package));
-              fprintf(stderr, "ACKNOWLEGMENT WINDOW : %u\n", pkt_get_window(package));
+              fprintf(stderr, "ACKNOWLEGMENT TYPE : %u\n", pkt_get_type(package2));
+              fprintf(stderr, "ACKNOWLEGMENT SEQNUM : %u\n", pkt_get_seqnum(package2));
+              fprintf(stderr, "ACKNOWLEGMENT WINDOW : %u\n", pkt_get_window(package2));
 
-              if(pkt_get_type(package) == 2)
+              if(pkt_get_type(package2) == 2)
               {
-                  num = pkt_get_seqnum(package);
+                  num = pkt_get_seqnum(package2);
                   for(int i = 0; i < 5 ; i++)
                   {
                       if(senderBuffer[i] == NULL)
@@ -230,8 +236,7 @@ void send_loop(int sfd, struct sockaddr_in6 *dest)
                       }
                       else if(pkt_get_seqnum(senderBuffer[i]) <= num)
                       {
-                          fprintf(stderr, "free senderBuffer[%d]\n", i);
-                          pkt_del(senderBuffer[i]);
+                          senderbuffer[i] == NULL;
                           bufferSize++;
                       }
                   }
