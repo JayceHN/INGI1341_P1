@@ -48,11 +48,9 @@ int main(int argc, char *argv[]){
 	// if no file send data from stdin
 	if(filename == NULL)
 	{
-		read_write_loop(sfd, NULL, &destAdd);
+		send_loop(sfd, &destAdd);
 	}
-
-
-	fprintf(stderr, "reveiver END !");
+	
 	return EXIT_SUCCESS;
 
 }

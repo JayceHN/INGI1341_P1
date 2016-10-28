@@ -55,7 +55,7 @@ int main(int argc, char *argv[])
 		//if no file write to stdout
 		if(filename == NULL)
 		{
-				read_write_loop(sfd, &destAdd, NULL);
+				receive_loop(sfd, &destAdd);
 		}
 
 

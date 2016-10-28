@@ -38,12 +38,11 @@ int create_socket(struct sockaddr_in6 *source_addr, int src_port, struct sockadd
 const char * real_address(const char *address, struct sockaddr_in6 *rval);
 
 
-/* Loop reading a socket and printing to stdout,
- * while reading stdin and writing to the socket
- * @sfd: The socket file descriptor. It is both bound and connected.
- * @return: as soon as stdin signals EOF
- */
-void read_write_loop(int sfd, struct sockaddr_in6 *src, struct sockaddr_in6 *dest);
+void send_loop(int sfd, struct sockaddr_in6 *dest);
+
+int checkTime(const int time1, const int time2);
+
+void receive_loop(int sfd, struct sockaddr_in6 *dest);
 
 /* Block the caller until a message is received on sfd,
  * and connect the socket to the source addresse of the received message
