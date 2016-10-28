@@ -52,10 +52,6 @@ uint8_t  pkt_get_window(const pkt_t *pkt)
 
 uint8_t  pkt_get_seqnum(const pkt_t *pkt)
 {
-		if(pkt == NULL)
-		{
-			return 0;
-		}
 		return pkt->seqnum;
 }
 

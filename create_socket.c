@@ -27,7 +27,8 @@ int create_socket(struct sockaddr_in6 *source_addr, int src_port, struct sockadd
   }
 
   //setting the source_addr and binding
-  if(source_addr){
+  if(source_addr)
+	{
     source_addr->sin6_family = AF_INET6;
     source_addr->sin6_port = htons(src_port);
     // assigning a name to a socket
@@ -55,21 +56,22 @@ int create_socket(struct sockaddr_in6 *source_addr, int src_port, struct sockadd
 
   const char * real_address(const char *address, struct sockaddr_in6 *rval)
   {
-  // init
-  struct addrinfo fam, *tmp;
-  memset(&fam, 0, sizeof(fam));
+  	// init
+  	struct addrinfo fam, *tmp;
+  	memset(&fam, 0, sizeof(fam));
 
-  //
-  fam.ai_family = AF_UNSPEC;
-  fam.ai_socktype = SOCK_DGRAM;
-  fam.ai_protocol = IPPROTO_UDP;
-  // identify an Internet host and a service
-  int err = getaddrinfo(address, NULL, &fam, &tmp);
-  // assertion
-  if(err!=0) return strerror(err);
-  // set reval
-  rval = memcpy(rval, tmp->ai_addr, sizeof(struct sockaddr_in6));
-  return NULL;
+  	//
+  	fam.ai_family = AF_UNSPEC;
+  	fam.ai_socktype = SOCK_DGRAM;
+  	fam.ai_protocol = IPPROTO_UDP;
+  	
+  	// identify an Internet host and a service
+  	int err = getaddrinfo(address, NULL, &fam, &tmp);
+  	// assertion
+  	if(err!=0) return strerror(err);
+  	// set reval
+  	rval = memcpy(rval, tmp->ai_addr, sizeof(struct sockaddr_in6));
+  	return NULL;
   }
 
 
@@ -97,7 +99,7 @@ int wait_for_client(int sfd)
 
 void send_loop(int sfd, struct sockaddr_in6 *dest)
 {
-    uint16_t seqnum = 1;
+    uint16_t seqnum = 0;
 
     pkt_t *senderBuffer[5];
     for(int i = 0; i < 5 ; i++)
@@ -158,7 +160,6 @@ void send_loop(int sfd, struct sockaddr_in6 *dest)
               fprintf(stderr, "Error while reading stdin\n");
           }
 
-          fprintf(stderr, "Reading data from stdin !\n");
 
           if(bufferSize > 0)
           {
@@ -174,7 +175,7 @@ void send_loop(int sfd, struct sockaddr_in6 *dest)
             pkt_set_payload(package1, decode, size);
             pkt_encode(package1, encode, &len);
 
-            fprintf(stderr, "Data was converted into package, now we send it \n");
+            fprintf(stderr, "Send package with seqnum : %u \n", pkt_get_seqnum(package1));
 
             err = sendto(sfd, encode, len, 0, (struct sockaddr*)dest, fromdest);
             if(err < 0)
@@ -183,15 +184,9 @@ void send_loop(int sfd, struct sockaddr_in6 *dest)
               fprintf(stderr, "error while sending message on the socket \n");
             }
 
-            fprintf(stderr, "pacakge was send with success\n");
-
             seqnum++;
             memset(encode, 0, MAXSIZE);
             len = MAXSIZE;
-
-            fprintf(stderr, "We put the package into the buffer \n");
-
-
 
             for(int i = 0 ; i < 5 ; i++)
             {
@@ -234,11 +229,10 @@ void send_loop(int sfd, struct sockaddr_in6 *dest)
                       {
 
                       }
-                      else if(pkt_get_seqnum(senderBuffer[i]) <= num)
+                      else if(pkt_get_seqnum(senderBuffer[i]) < num)
                       {
                           senderBuffer[i] = NULL;
                           bufferSize++;
-                          printf("bufferSize incremented : %d\n", bufferSize);
                       }
                   }
               }
@@ -246,7 +240,6 @@ void send_loop(int sfd, struct sockaddr_in6 *dest)
 
         if(bufferSize < 5)
         {
-          fprintf(stderr, "wee check if we have to resend some packages !\n");
           // check if we have to resend some packages
           for(int i = 0; i < 5 ; i++)
           {
@@ -259,6 +252,7 @@ void send_loop(int sfd, struct sockaddr_in6 *dest)
               if(checkTime(pkt_get_timestamp(senderBuffer[i]), stamp) == -1)
               {
                   //send it again
+					fprintf(stderr, "Sending the package again !\n");
                   pkt_encode(senderBuffer[i], encode, &len);
                   err = sendto(sfd, encode, len, 0, (struct sockaddr*)dest, fromdest);
                   if(err < 0)
