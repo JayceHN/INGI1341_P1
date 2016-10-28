@@ -159,7 +159,7 @@ void send_loop(int sfd, struct sockaddr_in6 *dest)
           }
 
           fprintf(stderr, "Reading data from stdin !\n");
-          
+
           if(bufferSize > 0)
           {
             //create a structure with the given information
@@ -173,9 +173,9 @@ void send_loop(int sfd, struct sockaddr_in6 *dest)
             pkt_set_window(package1, bufferSize);
             pkt_set_payload(package1, decode, size);
             pkt_encode(package1, encode, &len);
-            
+
             fprintf(stderr, "Data was converted into package, now we send it \n");
-            
+
             err = sendto(sfd, encode, len, 0, (struct sockaddr*)dest, fromdest);
             if(err < 0)
             {
@@ -191,7 +191,7 @@ void send_loop(int sfd, struct sockaddr_in6 *dest)
 
             fprintf(stderr, "We put the package into the buffer \n");
 
-            
+
 
             for(int i = 0 ; i < 5 ; i++)
             {
@@ -236,8 +236,9 @@ void send_loop(int sfd, struct sockaddr_in6 *dest)
                       }
                       else if(pkt_get_seqnum(senderBuffer[i]) <= num)
                       {
-                          senderbuffer[i] == NULL;
+                          senderBuffer[i] = NULL;
                           bufferSize++;
+                          printf("bufferSize incremented : %d\n", bufferSize);
                       }
                   }
               }
@@ -290,6 +291,7 @@ int checkTime(int time1, int time2)
 void receive_loop(int sfd, struct sockaddr_in6 *dest)
 {
     struct pollfd ufds[1];
+    int boolean = 0;
 
     ufds[0].fd = sfd;
     ufds[0].events = POLLIN;
@@ -321,6 +323,7 @@ void receive_loop(int sfd, struct sockaddr_in6 *dest)
 
     while(1)
     {
+
       rv = poll(ufds, 1, -1);
       if(rv == -1)
       {
@@ -329,33 +332,27 @@ void receive_loop(int sfd, struct sockaddr_in6 *dest)
 
       if(ufds[0].revents & POLLIN)
       {
-          fprintf(stderr, "Before receiving messgage \n");
+
           if((size = recvfrom(sfd, decode, MAXSIZE, 0, (struct sockaddr*)dest, &fromdest)) < 0)
           {
             fprintf(stderr, "error while reading socket !\n");
           }
           package = pkt_new();
           pkt_decode(decode, size, package);
-          memset(decode, 0, MAXSIZE);
 
-          fprintf(stderr, "Package decoded ! \n");
-          // the received package is the one expected
           if(pkt_get_seqnum(package) == seqnum)
           {
-              //printf the package to sdtout
+            boolean = 1;
               if(write(fileno(stdout), pkt_get_payload(package), pkt_get_length(package)) < 0)
               {
                 fprintf(stderr, "error while writing stdout \n");
               }
-              pkt_del(package);
-
+              memset(decode, 0, MAXSIZE);
               ack = pkt_new();
               pkt_set_type(ack, PTYPE_ACK);
               pkt_set_window(ack, bufferSize);
               pkt_set_seqnum(ack, seqnum);
-
               pkt_encode(ack, encode, &len);
-              fprintf(stderr, "before sendto ! ! \n");
               err = sendto(sfd, encode, len, 0, (struct sockaddr*)dest, fromdest);
               if(err < 0)
               {
@@ -363,34 +360,43 @@ void receive_loop(int sfd, struct sockaddr_in6 *dest)
                   fprintf(stderr, "error while sending acknowledgment \n");
               }
               seqnum++;
-              //check if there are valid packages in the buffer
-              for(int i = 0; i < 5 ; i++)
-              {
-                  if(pkt_get_seqnum(receiverBuffer[i]) == seqnum)
-                  {
-                      if(write(fileno(stdout), pkt_get_payload(receiverBuffer[i]), pkt_get_length(receiverBuffer[i])) < 0 )
-                      {
-                        printf("error while writing to stdout \n");
-                      }
-                      pkt_del(receiverBuffer[i]);
-                      bufferSize++;
-                      seqnum++;
-                      i = 0;
-                  }
-              }
           }
 
-          // the received package is out of order
-          for(int i = 0; i < 5; i++)
+          if(boolean == 0)
           {
+            // the received package is out of order
+            for(int i = 0; i < 5; i++)
+            {
               if(receiverBuffer[i] == NULL)
               {
                 receiverBuffer[i] = package;
-                pkt_del(package);
                 bufferSize--;
                 break;
               }
+            }
           }
+          boolean = 0;
+          
+          if(bufferSize < 5)
+          {
+              for(int i = 0; i < 5 ; i++)
+              {
+                if(pkt_get_seqnum(receiverBuffer[i]) == seqnum)
+                {
+                    if(write(fileno(stdout), pkt_get_payload(receiverBuffer[i]), pkt_get_length(receiverBuffer[i])) < 0 )
+                    {
+                        printf("error while writing to stdout \n");
+                    }
+                    receiverBuffer[i] = NULL;
+                    bufferSize++;
+                    seqnum++;
+                    i = 0;
+                }
+              }
+          }
+
+        }
+
+
       }
     }
-}
