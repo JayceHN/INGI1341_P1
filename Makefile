@@ -22,8 +22,8 @@ all: clean receiver sender
 debug: CFLAGS += -g -DDEBUG -Wno-unused-parameter -fno-omit-frame-pointer
 debug: clean sender
 debug: clean receiver
-sender: sender.o packet_interface.o create_socket.o
-receiver: receiver.o packet_interface.o create_socket.o
+sender: sender.o packet_interface.o transport_interface.o
+receiver: receiver.o packet_interface.o transport_interface.o
 
 .PHONY: clean
 

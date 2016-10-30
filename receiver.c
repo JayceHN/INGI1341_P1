@@ -1,5 +1,5 @@
 #include "packet_interface.h"
-#include "create_socket.h"
+#include "transport_interface.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -36,7 +36,7 @@ int main(int argc, char *argv[])
 		}
 
 
-		if(real_address(destName, &destAdd) != NULL)
+		if(real_address(destName, &destAdd) != 0)
 		{
 				fprintf(stderr, "error while converting address");
 		}
@@ -55,7 +55,7 @@ int main(int argc, char *argv[])
 		//if no file write to stdout
 		if(filename == NULL)
 		{
-				receive_loop(sfd, &destAdd);
+				receiver_loop(sfd, &destAdd);
 		}
 
 

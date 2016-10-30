@@ -1,42 +1,32 @@
 #include "packet_interface.h"
-#include <zlib.h>
-#include <stdint.h>
-#include <string.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <netinet/in.h>
 
+// status code that is returned
 pkt_status_code code;
 
 /*
 *
 */
 struct __attribute__((__packed__)) pkt {
-	ptypes_t type;
-	uint8_t window : 5;
-	uint8_t seqnum;
-	uint16_t length;
-	uint32_t timestamp;
-	uint32_t crc;
-	char *payload;
+	ptypes_t type; // PTYPE_DATA = 1 OR PTYPE_ACK = 2
+	uint8_t window : 5; // BETWEEN [0, 31]
+	uint8_t seqnum; // BETWEEN [0, 255]
+	uint16_t length; // BETWEEN [0, 512]
+	uint32_t timestamp; // OWN IMPLEMENTATION
+	uint32_t crc; // RESULT OF CRC32()
+	char *payload; // DATA TO BE SEND
 
 };
 
 
-/* Alloue et initialise une struct pkt
- * @return: NULL en cas d'erreur */
 pkt_t* pkt_new()
 {
 		pkt_t *packet = (pkt_t *)calloc(1, sizeof(pkt_t));
 		return packet;
 }
 
-
-/* Libère le pointeur vers la struct pkt, ainsi que toutes les
- * ressources associées
- */
 void pkt_del(pkt_t *pkt)
 {
+    free(pkt->payload);
     free(pkt);
 }
 
@@ -62,10 +52,6 @@ uint16_t pkt_get_length(const pkt_t *pkt)
 
 uint32_t pkt_get_timestamp   (const pkt_t *pkt)
 {
-		if(pkt == NULL)
-		{
-			return 61;
-		}
 		return pkt->timestamp;
 }
 
@@ -162,59 +148,64 @@ pkt_status_code pkt_decode(const char *data, const size_t len, pkt_t *pkt)
 			uint32_t timestamp = 0;
 			uint32_t crc = 0;
 
-			// decoder le header
+			// First the header is decoded containing the TYPE, WINDOW, SEQNUM AND LENGTH
 			memcpy(&header, data, sizeof(uint32_t));
 
-			// reconversion en host order
+			// we converte the header into host order
 			header = ntohl(header);
 
+      // we extract the different fields with bitshifts
 			uint16_t length = header;
 			uint8_t seqnum = header >> 16;
 			uint8_t window = (header << 3) >> 27;
 			uint8_t type = header >> 29;
 
+      // if the package is not containing a valid type return error code
 			if(type != PTYPE_DATA && type != PTYPE_ACK)
 			{
 					code = E_TYPE;
 					return code;
 			}
 
+      // set the fields of the structure in host-byte-order
 			pkt_set_type(pkt, type);
 			pkt_set_window(pkt, window);
 			pkt_set_seqnum(pkt, seqnum);
 			pkt_set_length(pkt, length);
 
-			// decoder le timestamp
+			// We continue by decoding the timestamp which is NOT converted into host-byte-order
 			memcpy(&timestamp, data+sizeof(uint32_t), sizeof(uint32_t));
 			pkt_set_timestamp(pkt, timestamp);
 
-			// si la longuer du payload ne correspond pas a ce qui est marque dans le paquet
+			// We check if the lenght is valid
 			if(pkt_get_length(pkt) != len-3*sizeof(uint32_t))
 			{
 					code = E_LENGTH;
 					return code;
 			}
 
-			//decoder le payload
+			// After checking its length we decode the payload
 			pkt_set_payload(pkt, data+(2*sizeof(uint32_t)), pkt_get_length(pkt));
 
-			//decode le crc;
+			// We then decode the crc
 			memcpy(&crc, data+(2*sizeof(uint32_t)+pkt_get_length(pkt)), sizeof(uint32_t));
 
+      // converting and setting crc into host-byte-order
 			crc = ntohl(crc);
 			pkt_set_crc(pkt, crc);
 
+      // recomputing the crc
 			uint32_t newCrc = 0;
 			newCrc = crc32(newCrc, (Bytef *)data, (2*sizeof(uint32_t)+pkt_get_length(pkt)));
 
-			// verifie le crc
+		  // check if the decoded crc was valid
 			if(newCrc != pkt_get_crc(pkt))
 			{
 				code =	E_CRC;
 				return code;
 			}
 
-			// le paquet est valide
+			// The package vas valid :)
 			code = PKT_OK;
 			return code;
 }
@@ -232,22 +223,22 @@ pkt_status_code pkt_decode(const char *data, const size_t len, pkt_t *pkt)
  */
 pkt_status_code pkt_encode(const pkt_t* pkt, char *buf, size_t *len)
 {
-			// pas assez de place dans le buffer
+			// We check if there is enough place in the buffer
 			if(*len < (3*sizeof(uint32_t)+pkt_get_length(pkt)))
 			{
 					code = E_NOMEM;
 					return code;
 			}
 
-			// mettre a 0 le contenu du buffer
+			// We initialize the buffers content to 0 before we extract data
 			memset(buf, 0, *len);
 
-			//variables locales
+			//variables
 			uint32_t header = 0;
 			uint32_t tmp = 0;
 			size_t size = 0;
 
-			// construction du header
+			// Here we add different fields to our header
 			header = (header | pkt->type) << 29;		// ajout du type
 			tmp = pkt->window << 24;								// ajout du window
 			header = (header | tmp);
@@ -256,30 +247,31 @@ pkt_status_code pkt_encode(const pkt_t* pkt, char *buf, size_t *len)
 			header = (header | pkt->length);				//ajout length
 
 
-			//conversion en network-byte-order et ajout au buffer
+			//We convert our header into network-byte-order and copy it into the buffer
 			header = htonl(header);
 			memcpy(buf, &header, sizeof(uint32_t));
-			size = size + sizeof(uint32_t);		// taille occupee dans le buffer ++
+			size = size + sizeof(uint32_t);		// we keep track of the size of the buffer
 
-			// creation du timestamp en network-byte-order
+			// We copy the timestamp into the buffer
 			uint32_t timestamp = 0;
 			timestamp = pkt_get_timestamp(pkt);
 			memcpy(buf+size, &timestamp, sizeof(uint32_t));
-			size = size+sizeof(uint32_t); 	// taille occupee dans le buffer ++
+			size = size+sizeof(uint32_t); 	// size of buffer is  increased
 
-			//ajout du payload dans le buffer
+			// We add the payload to the buffer
 			memcpy(buf+size, pkt_get_payload(pkt), pkt_get_length(pkt));
-			size = size+pkt_get_length(pkt);	// taille occupee dans le buffer ++
+			size = size+pkt_get_length(pkt);	// size of buffer is  increased
 
-			// calcul et ajout du crc en network-byte-order dans le buffer
+			// We compute the src and add it to the buffer in network-byte-order
 			uint32_t crc = 0;
 			crc = crc32(crc, (Bytef *)buf, size);
 			crc = htonl(crc);
 
 			memcpy(buf+size, &crc, sizeof(uint32_t));
-			size = size+sizeof(uint32_t);		// taille occupee dans le buffer ++
-			*len = size;						// taille finale occuppee dans le buffer
+			size = size+sizeof(uint32_t);		// size of buffer is increased
+			*len = size;						       // final size of the buffer
 
+      		// Buffer is ready to be send :)
 			code = PKT_OK;
 			return code;
 }
