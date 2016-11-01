@@ -148,16 +148,16 @@ void sender_loop(int sfd, struct sockaddr_in6 *dest)
 	uint16_t seqNum = 0;
 
 	//Buffer of maximum size
-	pkt_t *senderBuffer[MAX_WINDOW_SIZE];
+	pkt_t *senderBuffer[5];
 
-	for(i = 0; i < MAX_WINDOW_SIZE ; i++)
+	for(i = 0; i < WINDOW ; i++)
 	{
 		senderBuffer[i] = NULL;
 	}
 
 	// initialize bufferSize
-	uint8_t senderBufferSize = MAX_WINDOW_SIZE;
-	uint8_t receiverBufferSize = 1; // we assume that there is only one free space at the beginning
+	uint8_t senderBufferSize = WINDOW;
+	int receiverBufferSize = 0; // we assume that there is only one free space at the beginning
 
 	//we read on both : stdin and socket
 	struct pollfd ufds[2];
@@ -168,7 +168,7 @@ void sender_loop(int sfd, struct sockaddr_in6 *dest)
 	int rv = 0;
 
 	//while we read something on stdin we continue
-	while(!feof(stdin))
+	while(1)
 	{
 		//initializing poll to check if something was received (stdin or socket)
 		rv = poll(ufds, 2, -1);
@@ -216,21 +216,29 @@ void sender_loop(int sfd, struct sockaddr_in6 *dest)
 				pkt_encode(packet, coding, &len);
 
 				//only send it if receiver has space otherwise place it in the buffer
-				if(receiverBufferSize > 0)
+				if(receiverBufferSize > -1)
 				{
 					// we send the encoded data on the given socket to the given destination
 					// dont need to check if successful because if not we are never going to get
 					// an acknowledgement and we are sending it again !
 					sendto(sfd, coding, len, 0, (struct sockaddr*)dest, sizeof(struct sockaddr_in6));
+					fprintf(stderr, "SEND : -----------------------------------------------------\n");
+					fprintf(stderr, "Type : %u\n", pkt_get_type(packet));
+					fprintf(stderr, "Seqnum : %u\n", pkt_get_seqnum(packet));
+					fprintf(stderr, "Timestamp : %u\n", pkt_get_timestamp(packet));
+					fprintf(stderr, "Window sender : %u\n", pkt_get_window(packet));
+					fprintf(stderr, "Payload : %s\n", pkt_get_payload(packet));
+					fprintf(stderr, "-------------------------------------------------------------\n");
 				}
 
 				//place packet into senderBuffer
-				for(i = 0; i < MAX_WINDOW_SIZE ; i++)
+				for(i = 0; i < WINDOW ; i++)
 				{
 					// we found an empty space in the buffer
 					if(senderBuffer[i] == NULL)
 					{
 						senderBuffer[i] = packet;
+						fprintf(stderr, "Packet placed in SenderBuffer[%d] \n", i);
 						break;
 					}
 				}
@@ -252,6 +260,7 @@ void sender_loop(int sfd, struct sockaddr_in6 *dest)
         {
 			size = recvfrom(sfd, inPut, len, 0, (struct sockaddr *)dest, &(size_in6));
 
+
 			if(size < 0)
 			{
 				fprintf(stderr, "error while reading on socket ...\n" );
@@ -259,7 +268,8 @@ void sender_loop(int sfd, struct sockaddr_in6 *dest)
 
 			// creating and initializing packet
 			packet = pkt_new();
-			code = pkt_decode(coding, size, packet);
+			code = pkt_decode(inPut, size, packet);
+
 
 			// the pacakge is a valid acknowledgement
 			if(pkt_get_type(packet) == PTYPE_ACK && code == PKT_OK)
@@ -267,8 +277,12 @@ void sender_loop(int sfd, struct sockaddr_in6 *dest)
 				num = pkt_get_seqnum(packet);
 				receiverBufferSize = pkt_get_window(packet);
 
+
+				fprintf(stderr, "VALID ACKNOWLEDGMENT RECEIVED WITH SEQNUM : %u\n", pkt_get_seqnum(packet));
+				fprintf(stderr, "receiverBuffer now set to : %d\n", receiverBufferSize);
+
 				//every packet with a sequence number less than num has been accepted by the receiver
-				for(i = 0 ; i < MAX_WINDOW_SIZE ; i++)
+				for(i = 0 ; i < WINDOW ; i++)
 				{
 					if(senderBuffer[i] == NULL)
 					{
@@ -276,8 +290,10 @@ void sender_loop(int sfd, struct sockaddr_in6 *dest)
 					}
 					else if(pkt_get_seqnum(senderBuffer[i]) < num)
 					{
+						fprintf(stderr, "delete senderBuffer[%d] from buffer\n", i);
 						// packet was accepted by receiver
 						pkt_del(senderBuffer[i]); //delete the packet
+						senderBuffer[i] = NULL;
 						senderBufferSize++;	// more space in buffer
 					}
 				}
@@ -289,9 +305,9 @@ void sender_loop(int sfd, struct sockaddr_in6 *dest)
 		} // ends ufds[1]
 
 		// check if there are packets remaining in the buffer and maybe resend them
-		if(senderBufferSize < MAX_WINDOW_SIZE)
+		if(senderBufferSize < WINDOW)
 		{
-			for(i = 0; i < MAX_WINDOW_SIZE ; i++)
+			for(i = 0; i < WINDOW ; i++)
 			{
 				// get the time in seconds
 				now = time(NULL);
@@ -303,6 +319,7 @@ void sender_loop(int sfd, struct sockaddr_in6 *dest)
 					// timestamp expired, more than 5 sek in buffer
 					if(checkTime(pkt_get_timestamp(senderBuffer[i]), stamp) == -1)
 					{
+							fprintf(stderr, "resending package number %d\n", i);
 						// encode and send the packet
 						pkt_encode(senderBuffer[i], coding, &len);
 						sendto(sfd, coding, len, 0, (struct sockaddr *)dest, size_in6);
@@ -316,7 +333,6 @@ void sender_loop(int sfd, struct sockaddr_in6 *dest)
 	}// end while loop
 
 }// end sender_loop function
-
 void receiver_loop(int sfd, struct sockaddr_in6 *dest)
 {
 	int i;
@@ -327,9 +343,9 @@ void receiver_loop(int sfd, struct sockaddr_in6 *dest)
 	int rv;
 
 	pkt_t *packet, *ack;
-	pkt_t *receiverBuffer[MAX_WINDOW_SIZE];
+	pkt_t *receiverBuffer[WINDOW];
 
-	for(i = 0; i < MAX_WINDOW_SIZE ; i++)
+	for(i = 0; i < WINDOW ; i++)
 	{
 		receiverBuffer[i] = NULL;
 	}
@@ -339,7 +355,7 @@ void receiver_loop(int sfd, struct sockaddr_in6 *dest)
 
 
 	uint8_t senderBufferSize = 1;
-	uint8_t receiverBufferSize = MAX_WINDOW_SIZE; // we assume that there is only one free space at the beginning
+	uint8_t receiverBufferSize = WINDOW; // we assume that there is only one free space at the beginning
 
 	char inPut[MAX_PACKET_SIZE];
 	char coding[MAX_PACKET_SIZE];
@@ -379,6 +395,22 @@ void receiver_loop(int sfd, struct sockaddr_in6 *dest)
 			memset(coding, 0, MAX_PACKET_SIZE);
 			size = 0;
 
+			// the received packet is valid but out of sequence
+			if(pkt_get_seqnum(packet) != seqnum && pkt_get_type(packet) == PTYPE_DATA && code == PKT_OK)
+			{
+				// place the packet into the buffer
+				for(i = 0; i < WINDOW ; i++)
+				{
+					// there is some space in the buffer
+					if(receiverBuffer[i] == NULL)
+					{
+						receiverBuffer[i] = packet;
+						receiverBufferSize--;
+						break;
+					}
+				}
+			}
+
 			// the packet received is the expected one
 			if(pkt_get_seqnum(packet) == seqnum && pkt_get_type(packet) == PTYPE_DATA && code == PKT_OK)
 			{
@@ -386,8 +418,18 @@ void receiver_loop(int sfd, struct sockaddr_in6 *dest)
 				seqnum = incSeqNum(seqnum);
 				//set the sender window
 				senderBufferSize = pkt_get_window(packet);
+
+				printf("************ NEW PACKET ************ \n" 	);
+				printf("received packet's type : %d\n", pkt_get_type(packet));
+				printf("received packet's seqnum : %d\n", pkt_get_seqnum(packet));
+				printf("received packet's length : %d\n", pkt_get_length(packet));
+				printf("received packet's window : %d\n", pkt_get_window(packet));
+				printf("received packet's timestamp : %d\n", pkt_get_timestamp(packet));
+				fprintf(stderr, "received packet's payload : ");
 				// we printf out the content of the packet
 				size = write(fileno(stdout), pkt_get_payload(packet), pkt_get_length(packet));
+
+				fprintf(stderr, "\n");
 
 				if(size < 0)
 				{
@@ -404,10 +446,16 @@ void receiver_loop(int sfd, struct sockaddr_in6 *dest)
 
               	pkt_encode(ack, coding, &len);
 
+				printf("sent ack's type : %d\n", pkt_get_type(ack));
+				printf("sent ack's seqnum : %d\n", pkt_get_seqnum(ack));
+				printf("sent ack's length : %d\n", pkt_get_length(ack));
+				printf("sent ack's window : %d\n", pkt_get_window(ack));
+				printf("sent ack's timestamp : %d\n", pkt_get_timestamp(ack));
 				sendto(sfd, coding, len, 0, (struct sockaddr*)dest, sizeof(struct sockaddr_in6));
+				fprintf(stderr, "\n");
 
 				// we check if there are valid packets in the buffer now
-				for(i = 0; i < MAX_WINDOW_SIZE ; i++)
+				for(i = 0; i < WINDOW ; i++)
 				{
 					if(receiverBuffer[i] == NULL)
 					{
@@ -424,9 +472,10 @@ void receiver_loop(int sfd, struct sockaddr_in6 *dest)
 						}
 						// packet is deleted
 						pkt_del(receiverBuffer[i]);
+						receiverBuffer[i] = NULL;
 
 						// buffersize and seqnum adjusted
-						receiverBufferSize--;
+						receiverBufferSize++;
 						seqnum = incSeqNum(seqnum);
 
 						// re-start at the beginning
@@ -434,22 +483,6 @@ void receiver_loop(int sfd, struct sockaddr_in6 *dest)
 					}
 				}
 			} // end good packet
-
-			// the received packet is valid but out of sequence
-			if(pkt_get_seqnum(packet) != seqnum && pkt_get_type(packet) == PTYPE_DATA && code == PKT_OK)
-			{
-				// place the packet into the buffer
-				for(i = 0; i < MAX_WINDOW_SIZE ; i++)
-				{
-					// there is some space in the buffer
-					if(receiverBuffer[i] == NULL)
-					{
-						receiverBuffer[i] = packet;
-						receiverBufferSize--;
-						break;
-					}
-				}
-			}
 
 			// else the packet is not valid
 
