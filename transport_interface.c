@@ -170,12 +170,13 @@ void sender_loop(int sfd, struct sockaddr_in6 *dest, char const *fname)
 	}
 	else in_fd = fileno(stdin);
 	//while we read something on stdin we continue
+	ufds[0].fd = in_fd;
+	ufds[0].events = POLLIN;
+	ufds[1].fd = sfd;
+	ufds[1].events = POLLIN;
+
 	while(1)
 	{
-		ufds[0].fd = in_fd;
-		ufds[0].events = POLLIN;
-		ufds[1].fd = sfd;
-		ufds[1].events = POLLIN;
 
 		//initializing poll to check if something was received (stdin or socket)
 		rv = poll(ufds, 2, -1);
@@ -277,7 +278,7 @@ void sender_loop(int sfd, struct sockaddr_in6 *dest, char const *fname)
 			// creating and initializing packet
 			packet = pkt_new();
 			code = pkt_decode(inPut, size, packet);
-
+			fprintf(stderr, "seqNum ack == %d\n", pkt_get_seqnum(packet));
 
 			// the pacakge is a valid acknowledgement
 			if(pkt_get_type(packet) == PTYPE_ACK && code == PKT_OK)
@@ -429,13 +430,12 @@ void receiver_loop(int sfd, struct sockaddr_in6 *dest)
 				//set the sender window
 				senderBufferSize = pkt_get_window(packet);
 
-				printf("************ NEW PACKET ************ \n" 	);
-				printf("received packet's type : %d\n", pkt_get_type(packet));
-				printf("received packet's seqnum : %d\n", pkt_get_seqnum(packet));
-				printf("received packet's length : %d\n", pkt_get_length(packet));
-				printf("received packet's window : %d\n", pkt_get_window(packet));
-				printf("received packet's timestamp : %d\n", pkt_get_timestamp(packet));
-				fprintf(stderr, "received packet's payload : ");
+				fprintf(stderr, "************ NEW PACKET ************ \n" 	);
+				fprintf(stderr, "received packet's type : %d\n", pkt_get_type(packet));
+				fprintf(stderr, "received packet's seqnum : %d\n", pkt_get_seqnum(packet));
+				fprintf(stderr, "received packet's length : %d\n", pkt_get_length(packet));
+				fprintf(stderr, "received packet's window : %d\n", pkt_get_window(packet));
+				fprintf(stderr, "received packet's timestamp : %d\n", pkt_get_timestamp(packet));
 				// we printf out the content of the packet
 				size = write(fileno(stdout), pkt_get_payload(packet), pkt_get_length(packet));
 
@@ -456,11 +456,11 @@ void receiver_loop(int sfd, struct sockaddr_in6 *dest)
 
 				pkt_encode(ack, coding, &len);
 
-				printf("sent ack's type : %d\n", pkt_get_type(ack));
-				printf("sent ack's seqnum : %d\n", pkt_get_seqnum(ack));
-				printf("sent ack's length : %d\n", pkt_get_length(ack));
-				printf("sent ack's window : %d\n", pkt_get_window(ack));
-				printf("sent ack's timestamp : %d\n", pkt_get_timestamp(ack));
+				fprintf(stderr, "sent ack's type : %d\n", pkt_get_type(ack));
+				fprintf(stderr, "sent ack's seqnum : %d\n", pkt_get_seqnum(ack));
+				fprintf(stderr, "sent ack's length : %d\n", pkt_get_length(ack));
+				fprintf(stderr, "sent ack's window : %d\n", pkt_get_window(ack));
+				fprintf(stderr, "sent ack's timestamp : %d\n", pkt_get_timestamp(ack));
 				sendto(sfd, coding, len, 0, (struct sockaddr*)dest, sizeof(struct sockaddr_in6));
 				fprintf(stderr, "\n");
 
