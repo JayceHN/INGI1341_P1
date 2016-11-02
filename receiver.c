@@ -52,12 +52,7 @@ int main(int argc, char *argv[])
 			fprintf(stderr, "could not create socket");
 		}
 
-		//if no file write to stdout
-		if(filename == NULL)
-		{
-				receiver_loop(sfd, &destAdd);
-		}
-
+		receiver_loop(sfd, &destAdd, filename);
 
 		return EXIT_SUCCESS;
 

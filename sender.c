@@ -3,7 +3,9 @@
 #include "packet_interface.h"
 #include "transport_interface.h"
 
-int main(int argc, char *argv[]){
+int main(int argc, char *argv[])
+{
+	// Need at least hostname and portNumber
 	if(argc < 3)
 	{
 		fprintf(stderr, "Not engough arguments");
@@ -46,15 +48,8 @@ int main(int argc, char *argv[]){
 		fprintf(stderr, "could not create socket");
 	}
 
-	// if no file send data from stdin
-	if(filename == NULL)
-	{
-		sender_loop(sfd, &destAdd, NULL);
-	}
-	//filename is non null
-	else{
-		sender_loop(sfd, &destAdd, filename);
-	}
+	sender_loop(sfd, &destAdd, filename);
+
 
 
 	return EXIT_SUCCESS;

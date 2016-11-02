@@ -14,8 +14,11 @@
 #include <fcntl.h>
 #include <poll.h>
 #include <time.h>
+#include <sys/select.h>
 
 #define MAX_PACKET_SIZE 608
+#define TRUE 1
+#define FALSE 0
 
 /* Resolve the resource name to an usable IP address
  * @address: The name to resolve
@@ -50,7 +53,7 @@ int wait_for_client(int sfd);
 * @sfd : a file descriptor
 * @dest : the destination addresss to which the socket should send data
 */
-void sender_loop(int sfd, struct sockaddr_in6 *dest, char const *fname);
+void sender_loop(int sfd, struct sockaddr_in6 *dest, const char *fname);
 
 /*
 * Receiver is listening on its own src address and receiving data
@@ -59,7 +62,7 @@ void sender_loop(int sfd, struct sockaddr_in6 *dest, char const *fname);
 * @sfd : a file descriptor
 * @src : the src address to which receiver is listening
 */
-void receiver_loop(int sfd, struct sockaddr_in6 *src);
+void receiver_loop(int sfd, struct sockaddr_in6 *src, const char *fname);
 
 /*
 * comparing time1(0-60) and time2(0-60)
