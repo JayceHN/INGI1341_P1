@@ -4,12 +4,14 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/types.h>
+ #include <sys/stat.h>
 #include <sys/socket.h>
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <stddef.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <poll.h>
 #include <time.h>
 
@@ -48,7 +50,7 @@ int wait_for_client(int sfd);
 * @sfd : a file descriptor
 * @dest : the destination addresss to which the socket should send data
 */
-void sender_loop(int sfd, struct sockaddr_in6 *dest);
+void sender_loop(int sfd, struct sockaddr_in6 *dest, char const *fname);
 
 /*
 * Receiver is listening on its own src address and receiving data

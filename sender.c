@@ -9,6 +9,7 @@ int main(int argc, char *argv[]){
 		fprintf(stderr, "Not engough arguments");
 		return -1;
 	}
+
 	char *filename = NULL;
 	char *destName;
 	unsigned int port;
@@ -48,8 +49,13 @@ int main(int argc, char *argv[]){
 	// if no file send data from stdin
 	if(filename == NULL)
 	{
-		sender_loop(sfd, &destAdd);
+		sender_loop(sfd, &destAdd, NULL);
 	}
+	//filename is non null
+	else{
+		sender_loop(sfd, &destAdd, filename);
+	}
+
 
 	return EXIT_SUCCESS;
 

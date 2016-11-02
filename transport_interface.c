@@ -43,33 +43,33 @@ int create_socket(struct sockaddr_in6 *src, int src_port, struct sockaddr_in6 *d
 	if(src != NULL)
 	{
 		//adding port to src
-    	src->sin6_port = htons(src_port);
+		src->sin6_port = htons(src_port);
 
 		// bind source addr to the socket
 		bindfd = bind(sockfd, (struct sockaddr *) src, sizeof(struct sockaddr_in6));
 
 		//failed to bind src to the socket
 		if(bindfd < 0)
-    	{
-      		perror(strerror(errno));
-      		return -1;
-    	}
+		{
+			perror(strerror(errno));
+			return -1;
+		}
 	}
 
 	//setting dest address and connecting socket
-  	if(dest != NULL)
+	if(dest != NULL)
 	{
 		// adding port do dest
-    	dest->sin6_port = htons(dst_port);
-    	connectfd = connect(sockfd, (struct sockaddr *) dest, sizeof(struct sockaddr_in6));
+		dest->sin6_port = htons(dst_port);
+		connectfd = connect(sockfd, (struct sockaddr *) dest, sizeof(struct sockaddr_in6));
 
 		// connect failed
-    	if(connectfd < 0)
+		if(connectfd < 0)
 		{
-      		perror(strerror(errno));
-      		return -1;
-    	}
-  	}
+			perror(strerror(errno));
+			return -1;
+		}
+	}
 	// SUCCESS
 	return sockfd;
 }
@@ -77,22 +77,22 @@ int create_socket(struct sockaddr_in6 *src, int src_port, struct sockaddr_in6 *d
 int wait_for_client(int sfd)
 {
 	char buff[MAX_PACKET_SIZE];
-  	socklen_t len;
+	socklen_t len;
 
-  	struct sockaddr_in6 add;
-  	memset(&add, 0, sizeof(add));
+	struct sockaddr_in6 add;
+	memset(&add, 0, sizeof(add));
 
 	if(recvfrom(sfd, buff, MAX_PACKET_SIZE, MSG_PEEK, (struct sockaddr *)&add, &len ) == -1)
-  	{
-    	perror(strerror(errno));
-    	return -1;
-  	}
-
-  	if(connect(sfd, (struct sockaddr*)&add, len) == -1)
 	{
-    	perror(strerror(errno));
-    	return -1;
-  	}
+		perror(strerror(errno));
+		return -1;
+	}
+
+	if(connect(sfd, (struct sockaddr*)&add, len) == -1)
+	{
+		perror(strerror(errno));
+		return -1;
+	}
 
 	//SUCCESS
 	return 0;
@@ -112,19 +112,19 @@ uint8_t incSeqNum(uint8_t seqnum)
 
 int checkTime(int time1, int time2)
 {
-    if(time1 == 61)
-    {
-      return 0;
-    }
-    //difference is more than 5sec
-    if((time2 - time1) > 5 || (time2 - time1) < -5)
-    {
-        return -1;
-    }
-    return 0;
+	if(time1 == 61)
+	{
+		return 0;
+	}
+	//difference is more than 5sec
+	if((time2 - time1) > 5 || (time2 - time1) < -5)
+	{
+		return -1;
+	}
+	return 0;
 }
 
-void sender_loop(int sfd, struct sockaddr_in6 *dest)
+void sender_loop(int sfd, struct sockaddr_in6 *dest, char const *fname)
 {
 	// variables
 	int size = 0;
@@ -140,7 +140,7 @@ void sender_loop(int sfd, struct sockaddr_in6 *dest)
 
 	//variables for timestamp
 	time_t now;
-    struct tm *tm;
+	struct tm *tm;
 	uint32_t stamp = 0;
 
 
@@ -159,30 +159,36 @@ void sender_loop(int sfd, struct sockaddr_in6 *dest)
 	uint8_t senderBufferSize = WINDOW;
 	int receiverBufferSize = 0; // we assume that there is only one free space at the beginning
 
-	//we read on both : stdin and socket
+	//we read on both : stdin (or fname) and socket
 	struct pollfd ufds[2];
-	ufds[0].fd = fileno(stdin);
-    ufds[0].events = POLLIN;
-    ufds[1].fd = sfd;
-    ufds[1].events = POLLIN;
 	int rv = 0;
-
+	int in_fd = 0;
+	if(fname){
+		in_fd = open(fname, O_RDONLY);
+		if(in_fd < 0) perror(strerror(errno));
+	}
+	else in_fd = fileno(stdin);
 	//while we read something on stdin we continue
 	while(1)
 	{
+		ufds[0].fd = in_fd;
+		ufds[0].events = POLLIN;
+		ufds[1].fd = sfd;
+		ufds[1].events = POLLIN;
+
 		//initializing poll to check if something was received (stdin or socket)
 		rv = poll(ufds, 2, -1);
 		if(rv == -1)
-      	{
-          	perror(strerror(errno));
-      	}
+		{
+			perror(strerror(errno));
+		}
 
 		//something was received on stdin !
 		if(ufds[0].revents & POLLIN)
-        {
+		{
 			// we read what was written on stdin and place it in inPut
 			// size contains de number of bytes read
-			size = read(fileno(stdin), inPut, MAX_PACKET_SIZE);
+			size = read(in_fd, inPut, MAX_PACKET_SIZE);
 
 			// check if there was no error while reading
 			if(size < 0)
@@ -201,8 +207,8 @@ void sender_loop(int sfd, struct sockaddr_in6 *dest)
 
 				// check the time in seconds to set timestamp
 				now = time(NULL);
-            	tm = localtime (&now);
-            	stamp = tm->tm_sec;
+				tm = localtime (&now);
+				stamp = tm->tm_sec;
 				pkt_set_timestamp(packet, stamp);
 
 				// Set window decrease bufferSize beforehand
@@ -257,7 +263,7 @@ void sender_loop(int sfd, struct sockaddr_in6 *dest)
 
 		// if a packet is received on the socket
 		if(ufds[1].revents & POLLIN)
-        {
+		{
 			size = recvfrom(sfd, inPut, len, 0, (struct sockaddr *)dest, &(size_in6));
 
 
@@ -311,15 +317,15 @@ void sender_loop(int sfd, struct sockaddr_in6 *dest)
 			{
 				// get the time in seconds
 				now = time(NULL);
-            	tm = localtime (&now);
-            	stamp = tm->tm_sec;
+				tm = localtime (&now);
+				stamp = tm->tm_sec;
 
 				if(senderBuffer[i] != NULL)
 				{
 					// timestamp expired, more than 5 sek in buffer
 					if(checkTime(pkt_get_timestamp(senderBuffer[i]), stamp) == -1)
 					{
-							fprintf(stderr, "resending package number %d\n", i);
+						fprintf(stderr, "resending package number %d\n", i);
 						// encode and send the packet
 						pkt_encode(senderBuffer[i], coding, &len);
 						sendto(sfd, coding, len, 0, (struct sockaddr *)dest, size_in6);
@@ -331,15 +337,15 @@ void sender_loop(int sfd, struct sockaddr_in6 *dest)
 		}
 
 	}// end while loop
-
+	if(fname) close(in_fd);
 }// end sender_loop function
 void receiver_loop(int sfd, struct sockaddr_in6 *dest)
 {
 	int i;
 	struct pollfd ufds[1];
 
-    ufds[0].fd = sfd;
-    ufds[0].events = POLLIN;
+	ufds[0].fd = sfd;
+	ufds[0].events = POLLIN;
 	int rv;
 
 	pkt_t *packet, *ack;
@@ -373,14 +379,14 @@ void receiver_loop(int sfd, struct sockaddr_in6 *dest)
 	{
 		//initializing poll to check if something was received (stdin or socket)
 		rv = poll(ufds, 1, -1);
-      	if(rv == -1)
-      	{
-          	perror(strerror(errno));
-      	}
+		if(rv == -1)
+		{
+			perror(strerror(errno));
+		}
 
 		// Something is read on socket
 		if(ufds[0].revents & POLLIN)
-      	{
+		{
 
 			// try to read socket
 			size = recvfrom(sfd, coding, MAX_PACKET_SIZE, 0, (struct sockaddr*)dest, &size_in6);
@@ -441,10 +447,10 @@ void receiver_loop(int sfd, struct sockaddr_in6 *dest)
 				// now we need to send an acknowledgement
 				ack = pkt_new();
 				pkt_set_type(ack, PTYPE_ACK);
-              	pkt_set_window(ack, receiverBufferSize);
-              	pkt_set_seqnum(ack, seqnum);
+				pkt_set_window(ack, receiverBufferSize);
+				pkt_set_seqnum(ack, seqnum);
 
-              	pkt_encode(ack, coding, &len);
+				pkt_encode(ack, coding, &len);
 
 				printf("sent ack's type : %d\n", pkt_get_type(ack));
 				printf("sent ack's seqnum : %d\n", pkt_get_seqnum(ack));
