@@ -136,6 +136,7 @@ void sender_loop(int sfd, struct sockaddr_in6 *dest, char const *fname)
 	uint8_t num = 0;
 	pkt_status_code code;
 	socklen_t size_in6 = sizeof(struct sockaddr_in6);
+	int bFlag = 0;
 
 
 	//variables for timestamp
@@ -228,6 +229,7 @@ void sender_loop(int sfd, struct sockaddr_in6 *dest, char const *fname)
 					// dont need to check if successful because if not we are never going to get
 					// an acknowledgement and we are sending it again !
 					sendto(sfd, coding, len, 0, (struct sockaddr*)dest, sizeof(struct sockaddr_in6));
+					if(pkt_get_length(packet) == 0) bFlag++ ;
 					fprintf(stderr, "SEND : -----------------------------------------------------\n");
 					fprintf(stderr, "Type : %u\n", pkt_get_type(packet));
 					fprintf(stderr, "Seqnum : %u\n", pkt_get_seqnum(packet));
@@ -309,7 +311,7 @@ void sender_loop(int sfd, struct sockaddr_in6 *dest, char const *fname)
 			memset(coding, 0, MAX_PACKET_SIZE);
 			pkt_del(packet);
 		} // ends ufds[1]
-
+		if(bFlag > 0) break ;
 		// check if there are packets remaining in the buffer and maybe resend them
 		if(senderBufferSize < WINDOW)
 		{
@@ -343,6 +345,7 @@ void receiver_loop(int sfd, struct sockaddr_in6 *dest)
 {
 	int i;
 	struct pollfd ufds[1];
+	int bFlag = 0;
 
 	ufds[0].fd = sfd;
 	ufds[0].events = POLLIN;
@@ -398,6 +401,7 @@ void receiver_loop(int sfd, struct sockaddr_in6 *dest)
 			//SUCCEEDED TO READ SOCKET
 			packet = pkt_new();
 			code = pkt_decode(coding, size, packet);
+			if(pkt_get_length(packet) == 0) bFlag++ ;
 			memset(coding, 0, MAX_PACKET_SIZE);
 			size = 0;
 
@@ -443,7 +447,7 @@ void receiver_loop(int sfd, struct sockaddr_in6 *dest)
 				}
 
 				size = 0;
-
+				if(bFlag > 0) break;
 				// now we need to send an acknowledgement
 				ack = pkt_new();
 				pkt_set_type(ack, PTYPE_ACK);
