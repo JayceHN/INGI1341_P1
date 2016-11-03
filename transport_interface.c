@@ -190,7 +190,7 @@ void sender_loop(int sfd, struct sockaddr_in6 *dest, char const *fname)
 	{
 
 		//initializing poll to check if something was received (stdin or socket)
-		rv = poll(ufds, 2, -1);
+		rv = poll(ufds, 2, 150);
 
 		if(rv == -1)
 		{
@@ -263,7 +263,7 @@ void sender_loop(int sfd, struct sockaddr_in6 *dest, char const *fname)
 				//there is no more place in one of the buffers
 				if(senderBufferSize == 0 || receiverBufferSize < 0)
 				{
-						rv = poll(ufds, 2, -1);
+						rv = poll(ufds, 2, 150);
 						// we get something from the receiver
 
 						if(ufds[1].revents & POLLIN)
@@ -397,6 +397,7 @@ void sender_loop(int sfd, struct sockaddr_in6 *dest, char const *fname)
 			pkt_del(packet);
 		} // ends ufds[1]
 
+
 		// check if there are packets remaining in the buffer and maybe resend them
 		if(senderBufferSize < WINDOW)
 		{
@@ -486,17 +487,11 @@ void receiver_loop(int sfd, struct sockaddr_in6 *dest, const char *fname)
 	while(end == FALSE)
 	{
 		//initializing poll to check if something was received
-		rv = poll(ufds, 1, -1);
+		rv = poll(ufds, 1, 150);
 
 		if(rv == -1)
 		{
 			perror(strerror(errno));
-		}
-
-		if(rv == 0)
-		{
-			end = TRUE;
-			fprintf(stderr, "[DEBUG] -------------Receiver ended ---------------- !\n");
 		}
 
 		// Something is read on socket
