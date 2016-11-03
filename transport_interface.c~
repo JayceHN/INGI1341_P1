@@ -110,22 +110,6 @@ uint8_t incSeqNum(uint8_t seqnum)
 	}
 }
 
-uint8_t compareSeqNum(uint8_t seqnum1, uint8_t seqnum2)
-{
-	if(seqnum1 < seqnum2)
-	{
-		return 0;
-	}
-	else if(seqnum1 == 255 && seqnum2 == 0)
-	{
-		return 0;
-	}
-	else
-	{
-		return 1;
-	}
-}
-
 int checkTime(int time1, int time2)
 {
 	if(time1 == 61)
@@ -133,7 +117,7 @@ int checkTime(int time1, int time2)
 		return 0;
 	}
 	//difference is more than 2sec
-	if((time2 - time1) > 2 || (time2 - time1) < -2)
+	if((time2 - time1) > 1 || (time2 - time1) < - 1)
 	{
 		return -1;
 	}
@@ -164,7 +148,7 @@ void sender_loop(int sfd, struct sockaddr_in6 *dest, char const *fname)
 	uint32_t stamp = 0;
 
 	//Sequence number starts with 0
-	uint8_t seqNum = 0;
+	uint16_t seqNum = 0;
 
 
 	// if you want to change senderBufferSize just find and replace WINDOW with the size you want :)
@@ -223,13 +207,12 @@ void sender_loop(int sfd, struct sockaddr_in6 *dest, char const *fname)
 		//something was received on stdin or file was read
 		if(ufds[0].revents & POLLIN)
 		{
-			end = FALSE;
+
 			// if we read a file, we read it until the end
 			while(end == FALSE)
 			{
 				// read stdin or file
 				size = read(in_fd, inPut, MAX_PAYLOAD_SIZE);
-				fprintf(stderr, "[DEBUG] Size read : [%d]\n",size);
 
 				// if we read on stdin an can send it in one packet we leave the loop
 				if(size < MAX_PACKET_SIZE && in_fd == fileno(stdin))
@@ -286,10 +269,8 @@ void sender_loop(int sfd, struct sockaddr_in6 *dest, char const *fname)
 				}
 
 				//there is no more place in one of the buffers
-				if(senderBufferSize == 0 || receiverBufferSize == 0)
+				if(senderBufferSize == 0 || receiverBufferSize < 0)
 				{
-					while(senderBufferSize == 0 || receiverBufferSize == 0)
-					{
 						rv = poll(ufds, 2, 150);
 						// we get something from the receiver
 
@@ -314,7 +295,7 @@ void sender_loop(int sfd, struct sockaddr_in6 *dest, char const *fname)
 										{
 											// do nothing
 										}
-										else if(compareSeqNum(pkt_get_seqnum(senderBuffer[i]), pkt_get_seqnum(packet)) == 0)
+										else if(pkt_get_seqnum(senderBuffer[i]) < pkt_get_seqnum(packet))
 										{
 											fprintf(stderr, "[DEBUG] Delete senderBuffer[%d] with seqnum [%u] from senderBuffer\n", i, pkt_get_seqnum(senderBuffer[i]));
 											// packet was accepted by receiver
@@ -325,7 +306,7 @@ void sender_loop(int sfd, struct sockaddr_in6 *dest, char const *fname)
 									}
 								}
 						}
-						
+
 						// try to resend packets
 						for(i = 0; i < WINDOW ; i++)
 						{
@@ -347,8 +328,7 @@ void sender_loop(int sfd, struct sockaddr_in6 *dest, char const *fname)
 								len = (size_t)MAX_PACKET_SIZE;
 								memset(coding, 0, MAX_PACKET_SIZE);
 							}
-						}	
-					}
+						}
 				}// if senderBuffer == 0
 
 				// check if we have to resend packages
@@ -381,6 +361,8 @@ void sender_loop(int sfd, struct sockaddr_in6 *dest, char const *fname)
 			}// end while isReading
 		}// end ufds[0]
 
+		// reset end;
+		end = FALSE;
 
 		// if a packet is received on the socket (acknowledgement)
 		if(ufds[1].revents & POLLIN)
@@ -411,7 +393,7 @@ void sender_loop(int sfd, struct sockaddr_in6 *dest, char const *fname)
 					{
 						// do nothing
 					}
-					else if(compareSeqNum(pkt_get_seqnum(senderBuffer[i]), pkt_get_seqnum(packet)) == 0)
+					else if(pkt_get_seqnum(senderBuffer[i]) < pkt_get_seqnum(packet))
 					{
 						fprintf(stderr, "[DEBUG] Delete senderBuffer[%d] with seqnum [%u] from senderBuffer\n", i, pkt_get_seqnum(senderBuffer[i]));
 						// packet was accepted by receiver
@@ -542,12 +524,6 @@ void receiver_loop(int sfd, struct sockaddr_in6 *dest, const char *fname)
 			code = pkt_decode(coding, size, packet);
 			memset(coding, 0, MAX_PACKET_SIZE);
 
-			// the packet is empty so shut down receiver 
-			if(pkt_get_length(packet) == 0)
-			{
-				fprintf(stderr, "[DEBUG] Before breaking because length is 0\n");
-				break;
-			}
 			// the received packet is valid but out of sequence
 			if(pkt_get_seqnum(packet) != seqnum && pkt_get_type(packet) == PTYPE_DATA && code == PKT_OK)
 			{
