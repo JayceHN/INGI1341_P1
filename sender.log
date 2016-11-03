@@ -1,0 +1,4 @@
+[DEBUG] Packet with seqnum [0] and window size [4] send 
+[DEBUG] Packet with seqnum [0] placed in SenderBuffer[0] 
+[DEBUG] Acknowledgement with seqnum [1] received 
+[DEBUG] Delete senderBuffer[0] with seqnum [0] from senderBuffer
