@@ -325,7 +325,7 @@ void sender_loop(int sfd, struct sockaddr_in6 *dest, char const *fname)
 									}
 								}
 						}
-						
+
 						// try to resend packets
 						for(i = 0; i < WINDOW ; i++)
 						{
@@ -347,7 +347,7 @@ void sender_loop(int sfd, struct sockaddr_in6 *dest, char const *fname)
 								len = (size_t)MAX_PACKET_SIZE;
 								memset(coding, 0, MAX_PACKET_SIZE);
 							}
-						}	
+						}
 					}
 				}// if senderBuffer == 0
 
@@ -542,7 +542,7 @@ void receiver_loop(int sfd, struct sockaddr_in6 *dest, const char *fname)
 			code = pkt_decode(coding, size, packet);
 			memset(coding, 0, MAX_PACKET_SIZE);
 
-			// the packet is empty so shut down receiver 
+			// the packet is empty so shut down receiver
 			if(pkt_get_length(packet) == 0)
 			{
 				fprintf(stderr, "[DEBUG] Before breaking because length is 0\n");
