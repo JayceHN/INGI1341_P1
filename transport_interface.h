@@ -15,6 +15,7 @@
 #include <poll.h>
 #include <time.h>
 #include <sys/select.h>
+#include <fcntl.h>
 
 #define MAX_PACKET_SIZE 608
 #define TRUE 1
