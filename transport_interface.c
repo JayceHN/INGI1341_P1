@@ -185,13 +185,19 @@ void sender_loop(int sfd, struct sockaddr_in6 *dest, char const *fname)
 	ufds[1].events = POLLIN;
 
 
-	//while we read something on stdin we continue
-	while(endFile == FALSE || senderBufferSize != WINDOW)
+	//while we read something and buffer is not empty 
+	while(1)
 	{
+		// condition d'arrêt 
+		if(endFile == TRUE && senderBufferSize == WINDOW)
+		{
+			break;
+		}
 
 		//initializing poll to check if something was received (stdin or socket)
 		rv = poll(ufds, 2, 150);
 
+		// error with poll 
 		if(rv == -1)
 		{
 			perror(strerror(errno));
@@ -202,11 +208,13 @@ void sender_loop(int sfd, struct sockaddr_in6 *dest, char const *fname)
 		if(ufds[0].revents & POLLIN)
 		{
 
+			// if we read a file, we read it until the end 
 			while(end == FALSE)
 			{
+				// read stdin or file 
 				size = read(in_fd, inPut, MAX_PAYLOAD_SIZE);
 
-
+				// if we read on stdin an can send it in one packet we leave the loop 
 				if(size < MAX_PACKET_SIZE && in_fd == fileno(stdin))
 				{
 					end = TRUE;
@@ -220,8 +228,8 @@ void sender_loop(int sfd, struct sockaddr_in6 *dest, char const *fname)
 					break;
 				}
 
-				// there is place in both buffers so we can send packages
-				if(senderBufferSize > 0 && receiverBufferSize >= 0)
+				// there is place in both buffers so we can send packets
+				if(senderBufferSize > 0 && receiverBufferSize > 0)
 				{
 					packet = pkt_new();
 					pkt_set_type(packet, PTYPE_DATA); // we send data
@@ -351,8 +359,10 @@ void sender_loop(int sfd, struct sockaddr_in6 *dest, char const *fname)
 
 				}
 			}// end while isReading
-			end = FALSE;
 		}// end ufds[0]
+
+		// reset end;
+		end = FALSE;
 
 		// if a packet is received on the socket (acknowledgement)
 		if(ufds[1].revents & POLLIN)
@@ -429,7 +439,6 @@ void sender_loop(int sfd, struct sockaddr_in6 *dest, char const *fname)
 	{
 		close(in_fd);
 	}
-
 	shutdown(sfd, SHUT_WR);
 
 }// end sender_loop function
@@ -492,6 +501,7 @@ void receiver_loop(int sfd, struct sockaddr_in6 *dest, const char *fname)
 		if(rv == -1)
 		{
 			perror(strerror(errno));
+			break;
 		}
 
 		// Something is read on socket
